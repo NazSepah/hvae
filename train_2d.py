@@ -65,8 +65,6 @@ def _main(args):
     hpu_net = HierarchicalProbUNet(name='model/HPUNet')
     loss_train = hpu_net.loss(next_batch, sample_weights, mode=True, bs=cfg['train']['batch_size'])
     loss_valid = hpu_net.loss(next_batch, sample_weights, mode=False, bs=cfg['valid']['batch_size'])
-    #entropy_post, entropy_prior = hpu_net.entropy(next_batch, bs=cfg['train']['batch_size'])
-    #active_unit_post, active_unit_prior = hpu_net.active_units(next_batch, bs=cfg['train']['batch_size'])
 
     # set up the optimizer
     global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0), trainable=False)
@@ -80,23 +78,8 @@ def _main(args):
     loss_all = tf.placeholder(dtype=tf.float32, shape=(), name='loss_all')
     loss_seg = tf.placeholder(dtype=tf.float32, shape=(), name='loss_seg')
     loss_kl = []
-    ent_prior = []
-    ent_post = []
-    act_prior = []
-    act_post = []
     for i in range(nb_prob_scale):
-        #nb_units = active_unit_post[i].get_shape().as_list()[0]
         loss_kl.append(tf.placeholder(dtype=tf.float32, shape=(), name='loss_kl-{}'.format(i + 1)))
-        '''
-        ent_prior.append([tf.placeholder(dtype=tf.float32, shape=(), name='unit_entropy_prior-{}'.format(i + 1))
-                          for j in range(nb_units)])
-        ent_post.append([tf.placeholder(dtype=tf.float32, shape=(), name='unit_entropy_post-{}'.format(i + 1))
-                         for j in range(nb_units)])
-        act_prior.append([tf.placeholder(dtype=tf.float32, shape=(), name='unit_activity_prior-{}'.format(i + 1))
-                          for j in range(nb_units)])
-        act_post.append([tf.placeholder(dtype=tf.float32, shape=(), name='unit_activity_post-{}'.format(i + 1))
-                         for j in range(nb_units)])
-                         '''
 
     tf.summary.scalar('weight_decay', sample_weights)
     tf.summary.scalar('learning_rate', learning_rate)
@@ -106,26 +89,10 @@ def _main(args):
     loss_seg_tf = tf.summary.scalar('loss_seg', loss_seg)
 
     loss_kl_tf = []
-    ent_prior_tf = []
-    ent_post_tf = []
-    au_prior_tf = []
-    au_post_tf = []
     for i in range(nb_prob_scale):
-        #nb_units = active_unit_post[i].get_shape().as_list()[0]
         loss_kl_tf.append(tf.summary.scalar('loss_kl_{}'.format(i), loss_kl[i]))
-        '''
-        ent_prior_tf.append([tf.summary.scalar('unit_entropy_prior_{}_{}'.format(i, j), ent_prior[i][j])
-                             for j in range(nb_units)])
-        ent_post_tf.append([tf.summary.scalar('unit_entropy_post_{}_{}'.format(i, j), ent_post[i][j])
-                            for j in range(nb_units)])
-        au_prior_tf.append([tf.summary.scalar('unit_activity_prior_{}_{}'.format(i, j), act_prior[i][j])
-                            for j in range(nb_units)])
-        au_post_tf.append([tf.summary.scalar('unit_activity_post_{}_{}'.format(i, j), act_post[i][j])
-                           for j in range(nb_units)])
-        '''
 
-    loss_summary = tf.summary.merge([loss_all_tf, loss_seg_tf, lambd_tf] + ent_post_tf + ent_prior_tf +
-                                    au_prior_tf + au_post_tf + loss_kl_tf)
+    loss_summary = tf.summary.merge([loss_all_tf, loss_seg_tf, lambd_tf] + loss_kl_tf)
 
     init_op_global = tf.global_variables_initializer()
     init_op_local = tf.local_variables_initializer()
@@ -156,33 +123,16 @@ def _main(args):
             sample_weights_value = 800. * (_DECAY_RATE ** itr)
 
             b, l, _, s = sess.run([next_batch, loss_train, solver, train_summary],
-                                                                    feed_dict={sample_weights: sample_weights_value})
+                                  feed_dict={sample_weights: sample_weights_value})
 
             loss_all_train_np = l['supervised_loss']
             loss_seg_train_np = l['summaries']['rec_loss_mean']
 
             feed_dict_kl = {}
-            feed_dict_ent_prior = {}
-            feed_dict_ent_post = {}
-            feed_dict_act_prior = {}
-            feed_dict_act_post = {}
             for i in range(nb_prob_scale):
                 feed_dict_kl[loss_kl[i]] = l['summaries']['kl_{}'.format(i)]
-                '''
-                nb_units = len(a_post[i])
-                
-                for j in range(nb_units):
-                    feed_dict_ent_post[ent_post[i][j]] = e_post[i][j]
-                    feed_dict_ent_prior[ent_prior[i][j]] = e_prior[i][j]
-                    feed_dict_act_post[act_post[i][j]] = a_post[i][j]
-                    feed_dict_act_prior[act_prior[i][j]] = a_prior[i][j]
-                    '''
 
             summary = sess.run(loss_summary, feed_dict={**feed_dict_kl,
-                                                        #**feed_dict_ent_post,
-                                                        #**feed_dict_ent_prior,
-                                                        #**feed_dict_act_post,
-                                                        #**feed_dict_act_prior,
                                                         loss_all: loss_all_train_np,
                                                         loss_seg: loss_seg_train_np,
                                                         sample_weights: sample_weights_value,
@@ -210,27 +160,10 @@ def _main(args):
             loss_seg_valid_np = l['summaries']['rec_loss_mean']
 
             feed_dict_kl = {}
-            feed_dict_ent_prior = {}
-            feed_dict_ent_post = {}
-            feed_dict_act_prior = {}
-            feed_dict_act_post = {}
             for i in range(nb_prob_scale):
                 feed_dict_kl[loss_kl[i]] = l['summaries']['kl_{}'.format(i)]
-                '''
-                nb_units = len(a_post[i])
-                
-                for j in range(nb_units):
-                    feed_dict_ent_post[ent_post[i][j]] = e_post[i][j]
-                    feed_dict_ent_prior[ent_prior[i][j]] = e_prior[i][j]
-                    feed_dict_act_post[act_post[i][j]] = a_post[i][j]
-                    feed_dict_act_prior[act_prior[i][j]] = a_prior[i][j]
-                    '''
 
             summary = sess.run(loss_summary, feed_dict={**feed_dict_kl,
-                                                        #**feed_dict_ent_post,
-                                                        #**feed_dict_ent_prior,
-                                                        #**feed_dict_act_post,
-                                                        #**feed_dict_act_prior,
                                                         loss_all: loss_all_valid_np,
                                                         loss_seg: loss_seg_valid_np,
                                                         sample_weights: sample_weights_value,
