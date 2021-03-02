@@ -1,0 +1,53 @@
+{
+"train":{
+    "mode": "train",
+    "image_shape":[192, 192, 64, 4],
+    "shuffle": true,
+    "batch_size":64,
+    "nb_class": 5,
+    "base_num_filter":4,
+    "dr_rate":0.2,
+    "lr":1e-4,
+    "adam_beta1":0.90,
+    "weight_decay": true,
+    "nb_latent": 8,
+    "broadcast":false,
+    "combined_labels": false,
+    "data_augment": true,
+    "soft_label": false,
+    "label_dist": false,
+    "kl_loss": "geco",
+    "seg_loss": true,
+    "count_seg_loss": false,
+    "count_loss": false
+},
+  "valid":{
+    "mode": "valid",
+    "nb_class": 5,
+    "shuffle": false,
+    "batch_size": 64,
+    "combined_labels": false,
+    "data_augment": false,
+    "soft_labels": false
+  },
+
+  "callback":{
+    "mode": "valid",
+    "nb_class": 5,
+    "shuffle": false,
+    "batch_size":1,
+    "combined_labels": false,
+    "data_augment": false
+  },
+  "experiment": {
+    "name":"unet-prob-lc-balanced",
+    "mode":"train",
+    "save_np": false,
+    "pre_trained": false,
+    "prob": true,
+    "outdir": "/cim/nazsepah/projects/hprob-deepmind/results/",
+    "tfdir": "/cim/nazsepah/data_tf/neurorx_2d",
+    "pre_trained_checkpoint": "cnn-count-prob-gauss-multi-121/checkpoints/model.ckpt-60",
+    "nb_epochs": 1000
+  }
+}
