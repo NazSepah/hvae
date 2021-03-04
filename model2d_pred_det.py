@@ -72,14 +72,13 @@ class _HierarchicalCore(snt.AbstractModule):
         self._regularizers = regularizers
         self._convs_per_block = convs_per_block
         self._blocks_per_level = blocks_per_level
-        self._mode = False
         if down_channels_per_block is None:
             self._down_channels_per_block = channels_per_block
         else:
             self._down_channels_per_block = down_channels_per_block
         self._name = name
 
-    def _build(self, inputs, mean=False, mode=False):
+    def _build(self, inputs, mean=False):
         """A build-method allowing to sample from the module as specified.
 
         Args:
@@ -116,16 +115,11 @@ class _HierarchicalCore(snt.AbstractModule):
                                          self._num_base_filters * 2, self._num_base_filters)
         self._blocks_per_level = 3
         self._convs_per_block = 3
-        self._mode = mode
 
         encoder_features = inputs
         encoder_outputs = []
         num_levels = len(self._channels_per_block)
         num_latent_levels = len(self._latent_dims)
-        if isinstance(mean, bool):
-            mean = [mean] * num_latent_levels
-        distributions = []
-        used_latents = []
 
         # Iterate the descending levels in the U-Net encoder.
         for level in range(num_levels):
@@ -152,7 +146,7 @@ class _HierarchicalCore(snt.AbstractModule):
         decoder_features = encoder_outputs[-1]
         for level in range(num_latent_levels):
             scale = 3 if level == 0 else 2
-            decoder_output_hi = unet_utils.resize_up2d(decoder_features, scale=scale) #, name='{}'.format(level)
+            decoder_output_hi = unet_utils.resize_up2d(decoder_features, scale=scale)
             decoder_features = tf.concat(
                 [decoder_output_hi, encoder_outputs[::-1][level + 1]], axis=-1)
 
@@ -171,9 +165,7 @@ class _HierarchicalCore(snt.AbstractModule):
             #print("decoder post:", decoder_features)
 
         return {'decoder_features': decoder_features,
-                'encoder_features': encoder_outputs,
-                'distributions': distributions,
-                'used_latents': used_latents}
+                'encoder_features': encoder_outputs}
 
 
 class _StitchingDecoder(snt.AbstractModule):
@@ -225,12 +217,11 @@ class _StitchingDecoder(snt.AbstractModule):
         self._regularizers = regularizers
         self._convs_per_block = convs_per_block
         self._blocks_per_level = blocks_per_level
-        self._mode = False
         if down_channels_per_block is None:
             down_channels_per_block = channels_per_block
         self._down_channels_per_block = down_channels_per_block
 
-    def _build(self, encoder_features, decoder_features, mode=False):
+    def _build(self, encoder_features, decoder_features):
         """Build-method that returns the segmentation logits.
 
         Args:
@@ -250,7 +241,6 @@ class _StitchingDecoder(snt.AbstractModule):
                                          self._num_base_filters * 2, self._num_base_filters)
         self._blocks_per_level = 3
         self._convs_per_block = 3
-        self._mode = mode
 
         num_latents = len(self._latent_dims)
         start_level = num_latents + 1
@@ -389,13 +379,12 @@ class HierarchicalProbUNet(snt.AbstractModule):
             # to add to tensorboard
             l2_norm = lambda t: tf.sqrt(tf.reduce_sum(tf.pow(t, 2)))
             for gradient, variable in gradients:
-                #print(variable.name, gradient)
                 tf.summary.histogram("gradients/" + variable.name, l2_norm(gradient))
                 tf.summary.histogram("variables/" + variable.name, l2_norm(variable))
 
         return solver
 
-    def _build(self, img1, img2, mode=False):
+    def _build(self, img1):
         """Inserts all ops used during training into the graph exactly once.
 
         The first time this method is called given the input pair (seg, img) all
@@ -408,15 +397,15 @@ class HierarchicalProbUNet(snt.AbstractModule):
           img: A tensor of shape (b, h, w, c)
         Returns: None
         """
-        inputs = (img1, img2)
+        inputs = img1
         if self._cache == inputs:
             return
         else:
-            self._q_sample = self._posterior(img1, mode=mode) #tf.concat([img1, img2], axis=-1)
+            self._q_sample = self._posterior(img1)
             self._cache = inputs
         return
 
-    def reconstruct(self, img1, img2, mode=False):
+    def reconstruct(self, img1):
         """Reconstruct a segmentation using the posterior.
         Args:
           seg: A tensor of shape (b, h, w, num_classes).
@@ -426,14 +415,14 @@ class HierarchicalProbUNet(snt.AbstractModule):
         Returns:
           A segmentation tensor of shape (b,h,w,num_classes).
         """
-        self._build(img1, img2, mode)
+        self._build(img1)
         post_out = self._q_sample
         encoder_features = post_out['encoder_features']
         decoder_features = post_out['decoder_features']
         #return decoder_features
-        return self._f_comb(encoder_features=encoder_features, decoder_features=decoder_features, mode=mode)
+        return self._f_comb(encoder_features=encoder_features, decoder_features=decoder_features)
 
-    def rec_loss(self, seg, img1, img2, sample_weights, mode):
+    def rec_loss(self, seg, img1, sample_weights):
         """Cross-entropy reconstruction loss employed in the ELBO-/ GECO-objective.
 
         Args:
@@ -450,10 +439,10 @@ class HierarchicalProbUNet(snt.AbstractModule):
           batch as well as the employed loss mask.
         """
 
-        reconstruction = self.reconstruct(img1, img2, mode=mode)
+        reconstruction = self.reconstruct(img1)
         return geco_utils_det.ce_loss(reconstruction, seg, sample_weights)
 
-    def loss(self, batch, sample_weights, mode, bs):
+    def loss(self, batch, sample_weights, bs):
         """The full training objective, either ELBO or GECO.
 
         Args:
@@ -469,14 +458,11 @@ class HierarchicalProbUNet(snt.AbstractModule):
         img1 = batch[0][..., :4]
         img1 = tf.reshape(img1, [bs, 192, 192, 4])
 
-        img2 = batch[1][..., :4] - batch[0][..., :4]
-        img2 = None #tf.reshape(img2, [bs, 192, 192, 4])
-
         seg = tf.cast(batch[1][..., -1] > 0, tf.float32)
         seg = tf.reshape(seg, [bs, 192, 192])
 
         summaries = {}
-        rec_loss = self.rec_loss(seg, img1, img2, sample_weights, mode)
+        rec_loss = self.rec_loss(seg, img1, sample_weights)
 
         summaries['rec_loss_mean'] = rec_loss['mean']
         summaries['rec_loss_sum'] = rec_loss['sum']

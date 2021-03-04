@@ -154,7 +154,7 @@ class Reader:
             try:
                 subj = row[id_indx]
                 drug = row[drug_indx]
-                if (subj in ids_map) and (drug == treatment):
+                if (subj in ids_map) and (drug != treatment):
                     if subj not in list(placebo_ids):
                         placebo_ids.append(subj)
             except:

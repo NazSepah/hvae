@@ -68,13 +68,13 @@ class BrainDataProvider:
                 features={
                     'tp1': tf.FixedLenFeature([], tf.string),
                     'tp2': tf.FixedLenFeature([], tf.string),
+                    'id': tf.FixedLenFeature([], tf.string)
                     })
 
             input_images = tf.decode_raw(features['tp1'], tf.float64)
             input_images = tf.cast(tf.reshape(input_images, shape=(192, 192, 6)), tf.float32)
             output_images = tf.decode_raw(features['tp2'], tf.float64)
             output_images = tf.cast(tf.reshape(output_images, shape=(192, 192, 5)), tf.float32)
-
             return input_images, output_images
 
         def augmentation(input_image, output_image):

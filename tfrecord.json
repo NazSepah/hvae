@@ -33,7 +33,7 @@
     },
     "dim": [51, 198, 198],
     "time_points": ["m0", "m12", "m24"],
-    "mode" :"train",
+    "mode" :"valid",
     "break_tfrecords": false,
     "debug": false,
     "outdir": "/cim/nazsepah/data_tf/test",

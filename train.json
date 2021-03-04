@@ -1,0 +1,35 @@
+{
+"train":{
+    "mode": "train",
+    "image_shape":[192, 192, 64, 4],
+    "shuffle": true,
+    "batch_size":32,
+    "base_num_filter":4,
+    "adam_beta1":0.90,
+    "weight_decay": true,
+    "combined_labels": false,
+    "data_augment": true
+},
+  "valid":{
+    "mode": "valid",
+    "shuffle": false,
+    "batch_size": 32,
+    "data_augment": false
+  },
+
+  "callback":{
+    "mode": "valid",
+    "shuffle": false,
+    "batch_size":1,
+    "combined_labels": false,
+    "data_augment": false
+  },
+  "experiment": {
+    "name":"unet-det-lc-prior-res",
+    "mode":"train",
+    "save_np": false,
+    "outdir": "/cim/nazsepah/projects/hprob-deepmind-2d/results/",
+    "tfdir": "/cim/nazsepah/data_tf/test",
+    "nb_epochs": 1000
+  }
+}
