@@ -5,7 +5,8 @@ import numpy as np
 from shutil import copy
 
 from data_source2d import BrainDataProvider as tfDataProvider
-from callback import VisualizeSamples, PlotRocSeg, ActvieUnits, ZEntropy, Dist, ReplaceZ
+from callback import VisualizeSamples, PlotRocSeg, ActvieUnits, ZEntropy, Dist, ReplaceZ, GEDImages, GEDSamples, \
+    PlotRoc, PlotRocProb, PlotRocSegProb, PlotRocLevels, VisualizeSamplesLevels
 
 
 def _get_cfg():
@@ -34,6 +35,7 @@ def _main(args):
     os.makedirs(join(outdir, expt_name, 'rocs'), exist_ok=True)
     os.makedirs(join(outdir, expt_name, 'recons'), exist_ok=True)
     os.makedirs(join(outdir, expt_name, 'covs'), exist_ok=True)
+    os.makedirs(join(outdir, expt_name, 'dists'), exist_ok=True)
 
     cfg['callback']['data_augment'] = False
     gen_callback_valid = tfDataProvider(tfdir, cfg['callback'])
@@ -42,42 +44,89 @@ def _main(args):
 
     print("total number of callback samples:", nb_samples_callback_valid)
 
-    roc_callback = PlotRocSeg(cfg, reuse=True)
+    code_entropy_callback = ZEntropy(cfg, reuse=True)
+    code_entropy_callback.on_epoch_end(callback_data=callback_valid_data,
+                                       nb_imgs=5,
+                                       mode_value='valid',
+                                       epoch=1000)
+
+    dist_callback = Dist(cfg, reuse=True)
+    dist_callback.on_epoch_end(callback_data=callback_valid_data,
+                               nb_imgs=5,
+                               mode_value='valid',
+                               epoch=1000)
+
+    roc_callback = PlotRocLevels(cfg, reuse=True)
     roc_callback.on_epoch_end(callback_data=callback_valid_data,
                               nb_imgs=nb_samples_callback_valid,
                               mode_value='valid',
-                              epoch=15000)
+                              epoch=1500)
+
+    recon_callback = VisualizeSamplesLevels(cfg, name='valid', reuse=True)
+    recon_callback.on_epoch_end(callback_data=callback_valid_data,
+                                nb_imgs=20,
+                                nb_samples=10,
+                                level=3,
+                                epoch=1000)
+
+    recon_callback = VisualizeSamples(cfg, name='valid', reuse=True)
+    recon_callback.on_epoch_end(callback_data=callback_valid_data,
+                                nb_imgs=5,
+                                mode_value='valid',
+                                nb_samples=10,
+                                epoch=1000)
+
+    unit_activity_callback = ActvieUnits(cfg, reuse=True)
+    unit_activity_callback.on_epoch_end(callback_data=callback_valid_data,
+                                        nb_imgs=1,
+                                        mode_value='valid',
+                                        epoch=500)
+
+    roc_callback = PlotRoc(cfg, name='valid', reuse=True)
+    roc_callback.on_epoch_end(callback_data=callback_valid_data,
+                              nb_imgs=nb_samples_callback_valid,
+                              mode_value='train',
+                              epoch=20)
+
+    ged_callback = GEDImages(cfg, name='valid', reuse=True)
+    ged_callback.on_epoch_end(callback_data=callback_valid_data,
+                              nb_imgs=nb_samples_callback_valid,
+                              mode_value='valid',
+                              nb_samples=10,
+                              epoch=1000)
 
     roc_callback = ReplaceZ(cfg, reuse=True)
     roc_callback.on_epoch_end(callback_data=callback_valid_data,
                               nb_imgs=nb_samples_callback_valid,
                               mode_value='valid',
-                              epoch=45000)
+                              epoch=400)
 
-    recon_callback = VisualizeSamples(cfg, reuse=True)
-    recon_callback.on_epoch_end(callback_data=callback_valid_data,
-                                nb_imgs=20,
+    roc_callback = PlotRocSeg(cfg, name='valid', reuse=True)
+    roc_callback.on_epoch_end(callback_data=callback_valid_data,
+                              nb_imgs=nb_samples_callback_valid,
+                              mode_value='train',
+                              epoch=200)
+
+    roc_callback = PlotRocSegProb(cfg, name='valid', reuse=True)
+    roc_callback.on_epoch_end(callback_data=callback_valid_data,
+                              nb_imgs=nb_samples_callback_valid,
+                              mode_value='valid',
+                              nb_samples=100,
+                              epoch=1000)
+
+    ged_callback = GEDSamples(cfg, name='valid', reuse=True)
+    ged_callback.on_epoch_end(callback_data=callback_valid_data,
+                              nb_imgs=nb_samples_callback_valid,
+                              mode_value='valid',
+                              nb_samples=16,
+                              epoch=800)
+
+    roc_callback = PlotRocProb(cfg, name='valid', reuse=True)
+    roc_callback.on_epoch_end(callback_data=callback_valid_data,
+                                nb_imgs=nb_samples_callback_valid,
                                 mode_value='valid',
-                                nb_samples=10,
-                                epoch=40000)
-
-    code_entropy_callback = ZEntropy(cfg, reuse=True)
-    code_entropy_callback.on_epoch_end(callback_data=callback_valid_data,
-                                       nb_imgs=nb_samples_callback_valid,
-                                       mode_value='valid',
-                                       epoch=40000)
-
-    unit_activity_callback = ActvieUnits(cfg, reuse=True)
-    unit_activity_callback.on_epoch_end(callback_data=callback_valid_data,
-                                        nb_imgs=nb_samples_callback_valid,
-                                        mode_value='valid',
-                                        epoch=40000)
-
-    dist_callback = Dist(cfg, reuse=True)
-    dist_callback.on_epoch_end(callback_data=callback_valid_data,
-                                       nb_imgs=10,
-                                       mode_value='valid',
-                                       epoch=10000)
+                                nb_samples=100,
+                                epoch=600)
 
 
 if __name__ == "__main__":

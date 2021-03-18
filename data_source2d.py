@@ -68,16 +68,18 @@ class BrainDataProvider:
                 features={
                     'tp1': tf.FixedLenFeature([], tf.string),
                     'tp2': tf.FixedLenFeature([], tf.string),
+                    'id': tf.FixedLenFeature([], tf.string)
                     })
 
             input_images = tf.decode_raw(features['tp1'], tf.float64)
             input_images = tf.cast(tf.reshape(input_images, shape=(192, 192, 6)), tf.float32)
             output_images = tf.decode_raw(features['tp2'], tf.float64)
             output_images = tf.cast(tf.reshape(output_images, shape=(192, 192, 5)), tf.float32)
+            labels = tf.reduce_sum(output_images[..., -1])
+            labels = tf.cast(tf.greater(labels, 0), tf.float32)
+            return input_images, output_images, labels
 
-            return input_images, output_images
-
-        def augmentation(input_image, output_image):
+        def augmentation(input_image, output_image, labels):
 
             random_angles = tf.random_uniform(shape=(), minval=-np.pi / 4, maxval=np.pi / 4)
             image = tf.concat([input_image, output_image], axis=-1)
@@ -100,7 +102,7 @@ class BrainDataProvider:
             input_image_r = tf.manip.roll(input_image_r, shift_value, axis=1)
             output_image_r = tf.manip.roll(output_image_r, shift_value, axis=1)
 
-            return input_image_r, output_image_r
+            return input_image_r, output_image_r, labels
 
         dataset = tf.data.TFRecordDataset(self._filename)
         if self._mode == 'train':
